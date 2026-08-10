@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PsychoMiko</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-900 text-white p-4 font-sans">
+
+    <div class="max-w-md mx-auto bg-gray-800 rounded-xl shadow-lg p-6">
+        <h1 class="text-3xl font-bold text-center text-purple-400 mb-6">PsychoMiko</h1>
+        
+        <!-- Mushroom Selection -->
+        <label class="block mb-2 font-semibold">Select Strain:</label>
+        <select id="mushroomType" class="w-full p-2 mb-4 bg-gray-700 rounded border border-gray-600 focus:outline-none focus:border-purple-500" onchange="updateForm()">
+            <!-- Values represent hypothetical market price per gram in USD -->
+            <option value="1.00">Oyster ($1.00/g)</option>
+            <option value="1.50">Shiitake ($1.50/g)</option>
+            <option value="2.00">Lion's Mane ($2.00/g)</option>
+            <option value="2.50">Maitake ($2.50/g)</option>
+            <option value="3.00">Chanterelle ($3.00/g)</option>
+        </select>
+
+        <!-- Product Form Selection -->
+        <label class="block mb-2 font-semibold">Product Form:</label>
+        <div class="flex gap-4 mb-4">
+            <label class="flex items-center">
+                <input type="radio" name="productForm" value="raw" checked class="mr-2 text-purple-500" onchange="updateForm()"> Raw (Dried)
+            </label>
+            <label class="flex items-center">
+                <input type="radio" name="productForm" value="gummy" class="mr-2 text-purple-500" onchange="updateForm()"> Gummies
+            </label>
+        </div>
+
+        <!-- Quantity Selection -->
+        <label class="block mb-2 font-semibold">Quantity:</label>
+        <select id="quantity" class="w-full p-2 mb-6 bg-gray-700 rounded border border-gray-600 focus:outline-none focus:border-purple-500" onchange="calculateTotal()">
+            <!-- Options populated by JS based on Product Form -->
+        </select>
+
+        <!-- Total Price -->
+        <div class="border-t border-gray-600 pt-4 mb-6">
+            <h2 class="text-xl">Total: <span id="totalPrice" class="text-2xl font-bold text-green-400">$0.00</span></h2>
+        </div>
+
+        <button id="orderBtn" class="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-4 rounded transition duration-200" onclick="submitOrder()">
+            Place Order
+        </button>
+    </div>
+
+    <script>
+        const tg = window.Telegram.WebApp;
+        tg.expand(); // Expands the Mini App to full height
+
+        const rawOptions = [
+            { label: "1/8 oz (3.5g)", grams: 3.5 },
+            { label: "1/4 oz (7g)", grams: 7 },
+            { label: "1/2 oz (14g)", grams: 14 },
+            { label: "1 oz (28g)", grams: 28 }
+        ];
+
+        const gummyOptions = [
+            { label: "10 Pack (10g eq)", grams: 10 },
+            { label: "20 Pack (20g eq)", grams: 20 }
+        ];
+
+        function updateForm() {
+            const form = document.querySelector('input[name="productForm"]:checked').value;
+            const quantitySelect = document.getElementById('quantity');
+            quantitySelect.innerHTML = '';
+
+            const options = form === 'raw' ? rawOptions : gummyOptions;
+            
+            options.forEach(opt => {
+                let el = document.createElement('option');
+                el.value = opt.grams;
+                el.textContent = opt.label;
+                quantitySelect.appendChild(el);
+            });
+            
+            calculateTotal();
+        }
+
+        function calculateTotal() {
+            const basePricePerGram = parseFloat(document.getElementById('mushroomType').value);
+            const form = document.querySelector('input[name="productForm"]:checked').value;
+            const grams = parseFloat(document.getElementById('quantity').value);
+
+            let total = 0;
+            if (form === 'raw') {
+                total = basePricePerGram * grams;
+            } else if (form === 'gummy') {
+                // 50% markup on the base market price
+                const markedUpPrice = basePricePerGram * 1.5;
+                total = markedUpPrice * grams;
+            }
+
+            document.getElementById('totalPrice').innerText = `$${total.toFixed(2)}`;
+        }
+
+        function submitOrder() {
+            const strainName = document.getElementById('mushroomType').options[document.getElementById('mushroomType').selectedIndex].text.split(' ')[0];
+            const form = document.querySelector('input[name="productForm"]:checked').value;
+            const quantityLabel = document.getElementById('quantity').options[document.getElementById('quantity').selectedIndex].text;
+            const total = document.getElementById('totalPrice').innerText;
+
+            const orderData = {
+                strain: strainName,
+                form: form,
+                size: quantityLabel,
+                price: total
+            };
+
+            // Send data back to the Telegram Bot
+            tg.sendData(JSON.stringify(orderData));
+            tg.close();
+        }
+
+        // Initialize form on load
+        updateForm();
+    </script>
+</body>
+</html>
