@@ -9,51 +9,78 @@
 </head>
 <body class="bg-gray-900 text-white p-4 font-sans">
 
-    <div class="max-w-md mx-auto bg-gray-800 rounded-xl shadow-lg p-6">
+    <div class="max-w-md mx-auto">
+        <!-- Main Header (Always Visible) -->
         <h1 class="text-3xl font-bold text-center text-purple-400 mb-6">PsychoMiko</h1>
-        
-        <!-- Mushroom Selection -->
-        <label class="block mb-2 font-semibold">Select Strain:</label>
-        <select id="mushroomType" class="w-full p-2 mb-4 bg-gray-700 rounded border border-gray-600 focus:outline-none focus:border-purple-500" onchange="updateForm()">
-            <!-- Values represent actual market price per gram in USD -->
-            <option value="12.00" data-img="gt.PNG">Golden Teacher ($12.00/g)</option>
-            <option value="13.00" data-img="bplus.PNG">B+ ($13.00/g)</option>
-            <option value="21.00" data-img="snape.PNG">Starry Nights ($21.00/g)</option>
-            <option value="23.00" data-img="blueyvuitton.PNG">Bluey Vuitton ($23.00/g)</option>
-            <option value="25.00" data-img="enigma.PNG">Enigma ($25.00/g)</option>
-        </select>
 
-        <!-- Product Form Selection -->
-        <label class="block mb-2 font-semibold">Product Form:</label>
-        <div class="flex gap-4 mb-4">
-            <label class="flex items-center">
-                <input type="radio" name="productForm" value="raw" checked class="mr-2 text-purple-500" onchange="updateForm()"> Raw (Dried)
-            </label>
-            <label class="flex items-center">
-                <input type="radio" name="productForm" value="gummy" class="mr-2 text-purple-500" onchange="updateForm()"> Gummies
-            </label>
-        </div>
+        <!-- ============================================= -->
+        <!-- SCREEN 1: PRODUCT SELECTION GRID -->
+        <!-- ============================================= -->
+        <section id="selection-screen">
+            <div id="product-grid" class="grid grid-cols-2 gap-4">
+                <!-- Product cards will be generated here by JavaScript -->
+            </div>
+        </section>
 
-        <!-- Quantity Selection -->
-        <label class="block mb-2 font-semibold">Quantity:</label>
-        <select id="quantity" class="w-full p-2 mb-6 bg-gray-700 rounded border border-gray-600 focus:outline-none focus:border-purple-500" onchange="calculateTotal()">
-            <!-- Options populated by JS based on Product Form -->
-        </select>
+        <!-- ============================================= -->
+        <!-- SCREEN 2: ORDER DETAILS AND FORM -->
+        <!-- ============================================= -->
+        <section id="details-screen" class="hidden">
+            <div class="bg-gray-800 rounded-xl shadow-lg p-6">
+                <!-- Product Detail Display -->
+                <div class="flex justify-center mb-6">
+                    <img id="detailProductImage" src="" alt="Mushroom Strain" class="h-48 w-48 object-cover rounded-xl shadow-lg border-2 border-gray-600">
+                </div>
+                
+                <!-- Mushroom Selection Dropdown (For user flexibility) -->
+                <label class="block mb-2 font-semibold">Selected Strain:</label>
+                <select id="mushroomType" class="w-full p-2 mb-4 bg-gray-700 rounded border border-gray-600 focus:outline-none focus:border-purple-500" onchange="updateFormContextual()">
+                    <!-- Dropdown options populated contextually -->
+                </select>
 
-        <!-- Total Price -->
-        <div class="border-t border-gray-600 pt-4 mb-6">
-            <h2 class="text-xl">Total: <span id="totalPrice" class="text-2xl font-bold text-green-400">$0.00</span></h2>
-        </div>
+                <!-- Product Form Selection -->
+                <label class="block mb-2 font-semibold">Product Form:</label>
+                <div class="flex gap-4 mb-4">
+                    <label class="flex items-center">
+                        <input type="radio" name="productForm" value="raw" checked class="mr-2 text-purple-500" onchange="updateFormContextual()"> Raw (Dried)
+                    </label>
+                    <label class="flex items-center">
+                        <input type="radio" name="productForm" value="gummy" class="mr-2 text-purple-500" onchange="updateFormContextual()"> Gummies
+                    </label>
+                </div>
 
-        <button id="orderBtn" class="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-4 rounded transition duration-200" onclick="submitOrder()">
-            Place Order
-        </button>
+                <!-- Quantity Selection -->
+                <label class="block mb-2 font-semibold">Quantity:</label>
+                <select id="quantity" class="w-full p-2 mb-6 bg-gray-700 rounded border border-gray-600 focus:outline-none focus:border-purple-500" onchange="calculateTotal()">
+                    <!-- Options populated contextually based on Form -->
+                </select>
+
+                <!-- Total Price -->
+                <div class="border-t border-gray-600 pt-4 mb-6">
+                    <h2 class="text-xl">Total: <span id="totalPrice" class="text-2xl font-bold text-green-400">$0.00</span></h2>
+                </div>
+
+                <button id="orderBtn" class="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-4 rounded transition duration-200" onclick="submitOrder()">
+                    Place Order
+                </button>
+            </div>
+        </section>
     </div>
 
     <script>
         const tg = window.Telegram.WebApp;
         tg.expand(); // Expands the Mini App to full height
 
+        // Pre-loaded product list to match your actual file names from image_0.png
+        const products = [
+            { id: "12.00", name: "Golden Teacher", img: "gt.PNG", basePrice: 12.00 },
+            { id: "13.00", name: "B+", img: "bplus.PNG", basePrice: 13.00 },
+            { id: "21.00", name: "Starry Nights", img: "snape.PNG", basePrice: 21.00 },
+            { id: "23.00", name: "Bluey Vuitton", img: "blueyvuitton.PNG", basePrice: 23.00 },
+            { id: "25.00", name: "Enigma", img: "enigma.PNG", basePrice: 25.00 }
+        ];
+
+        // Core ordering options
         const rawOptions = [
             { label: "1/8 oz (3.5g)", grams: 3.5 },
             { label: "1/4 oz (7g)", grams: 7 },
@@ -66,7 +93,102 @@
             { label: "20 Pack (20g eq)", grams: 20 }
         ];
 
-        function updateForm() {
+        // ---------------------------------------------
+        // Core Logic
+        // ---------------------------------------------
+
+        function init() {
+            populateSelectionGrid();
+            populateDropdown();
+            showSelectionScreen();
+
+            // Set up the Telegram Back Button behavior
+            tg.BackButton.onClick(() => {
+                showSelectionScreen();
+            });
+        }
+
+        // Screen 1 Logic: Generate the grid
+        function populateSelectionGrid() {
+            const grid = document.getElementById('product-grid');
+            grid.innerHTML = ''; // Clear previous content
+
+            products.forEach(p => {
+                // Create card container
+                const card = document.createElement('div');
+                card.className = "bg-gray-800 rounded-xl shadow-lg p-4 flex flex-col items-center cursor-pointer transform hover:scale-105 transition-transform duration-200";
+                card.onclick = () => showDetailsScreen(p.id);
+
+                // Add Image
+                const img = document.createElement('img');
+                img.src = p.img;
+                img.alt = p.name;
+                img.className = "h-32 w-32 object-cover rounded-lg mb-4 border border-gray-600 shadow-md";
+                card.appendChild(img);
+
+                // Add Name
+                const nameH2 = document.createElement('h2');
+                nameH2.className = "text-lg font-bold text-white text-center mb-1";
+                nameH2.textContent = p.name;
+                card.appendChild(nameH2);
+
+                // Add Base Price
+                const priceP = document.createElement('p');
+                priceP.className = "text-sm text-gray-400 text-center";
+                priceP.textContent = `$${p.basePrice.toFixed(2)}/g base`;
+                card.appendChild(priceP);
+
+                grid.appendChild(card);
+            });
+        }
+
+        // Populates the dropdown once for both screens
+        function populateDropdown() {
+            const select = document.getElementById('mushroomType');
+            products.forEach(p => {
+                const el = document.createElement('option');
+                el.value = p.id;
+                // Important: Keep the (g) for calculation context in dropdown label
+                el.textContent = `${p.name} ($${p.basePrice.toFixed(2)}/g)`; 
+                el.setAttribute('data-img', p.img);
+                select.appendChild(el);
+            });
+        }
+
+        // Navigation: Go to Screen 1
+        function showSelectionScreen() {
+            tg.BackButton.hide();
+            document.getElementById('details-screen').classList.add('hidden');
+            document.getElementById('selection-screen').classList.remove('hidden');
+        }
+
+        // Navigation: Go to Screen 2
+        function showDetailsScreen(productId) {
+            // 1. Show Screen
+            document.getElementById('selection-screen').classList.add('hidden');
+            document.getElementById('details-screen').classList.remove('hidden');
+            tg.BackButton.show();
+
+            // 2. Pre-select chosen product in detailed form
+            const select = document.getElementById('mushroomType');
+            select.value = productId;
+            
+            // 3. Pre-set the details page image
+            const selectedProduct = products.find(p => p.id === productId);
+            document.getElementById('detailProductImage').src = selectedProduct.img;
+
+            // 4. Force calculation for the pre-selected strain
+            updateFormContextual(); 
+        }
+
+        // Contextual Update logic (replaces updateForm)
+        function updateFormContextual() {
+            // Update the detailed form visual with selected image
+            const select = document.getElementById('mushroomType');
+            const selectedImg = select.options[select.selectedIndex].getAttribute('data-img');
+            document.getElementById('detailProductImage').src = selectedImg;
+
+            // Handle quantity and total contextual updates
             const form = document.querySelector('input[name="productForm"]:checked').value;
             const quantitySelect = document.getElementById('quantity');
             quantitySelect.innerHTML = '';
@@ -83,6 +205,7 @@
             calculateTotal();
         }
 
+        // Core Calculation
         function calculateTotal() {
             const basePricePerGram = parseFloat(document.getElementById('mushroomType').value);
             const form = document.querySelector('input[name="productForm"]:checked').value;
@@ -100,8 +223,12 @@
             document.getElementById('totalPrice').innerText = `$${total.toFixed(2)}`;
         }
 
+        // Final Order Submission
         function submitOrder() {
-            const strainName = document.getElementById('mushroomType').options[document.getElementById('mushroomType').selectedIndex].text.split(' ')[0];
+            // Updated to grab the full text of the option contextually
+            const select = document.getElementById('mushroomType');
+            const strainName = select.options[select.selectedIndex].text.split(' (')[0];
+            
             const form = document.querySelector('input[name="productForm"]:checked').value;
             const quantityLabel = document.getElementById('quantity').options[document.getElementById('quantity').selectedIndex].text;
             const total = document.getElementById('totalPrice').innerText;
@@ -119,7 +246,7 @@
         }
 
         // Initialize form on load
-        updateForm();
+        init();
     </script>
 </body>
 </html>
