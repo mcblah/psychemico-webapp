@@ -10,8 +10,18 @@
 <body class="bg-gray-900 text-white p-4 font-sans">
 
     <div class="max-w-md mx-auto">
-        <!-- Main Header (Always Visible) -->
-        <h1 class="text-3xl font-bold text-center text-purple-400 mb-6">PsycheMico</h1>
+        
+        <!-- Main Header with Cart Button -->
+        <div class="flex justify-between items-center mb-6">
+            <div class="w-8"></div> <!-- Spacer to keep title centered -->
+            <h1 class="text-3xl font-bold text-center text-purple-400">PsycheMico</h1>
+            <button onclick="showCartScreen()" class="relative text-gray-300 hover:text-white transition cursor-pointer">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
+                </svg>
+                <span id="cartBadge" class="hidden absolute -top-1 -right-2 bg-red-500 text-white text-xs font-bold px-1.5 py-0.5 rounded-full shadow-lg">0</span>
+            </button>
+        </div>
 
         <!-- ============================================= -->
         <!-- SCREEN 1: PRODUCT SELECTION GRID -->
@@ -27,31 +37,53 @@
         <!-- ============================================= -->
         <section id="details-screen" class="hidden">
             <div class="bg-gray-800 rounded-xl shadow-lg p-6">
-                <!-- Product Detail Display -->
                 <div class="flex justify-center mb-6">
                     <img id="detailProductImage" src="" alt="Product Image" class="h-48 w-48 object-cover rounded-xl shadow-lg border-2 border-gray-600">
                 </div>
                 
-                <!-- Product Selection Dropdown -->
                 <label class="block mb-2 font-semibold">Selected Product:</label>
                 <select id="mushroomType" class="w-full p-2 mb-6 bg-gray-700 rounded border border-gray-600 focus:outline-none focus:border-purple-500" onchange="updateFormContextual()">
-                    <!-- Dropdown options populated contextually -->
                 </select>
 
-                <!-- Quantity Selection -->
                 <label class="block mb-2 font-semibold">Quantity:</label>
                 <select id="quantity" class="w-full p-2 mb-6 bg-gray-700 rounded border border-gray-600 focus:outline-none focus:border-purple-500" onchange="calculateTotal()">
-                    <!-- Options populated contextually based on product type -->
                 </select>
 
-                <!-- Total Price -->
                 <div class="border-t border-gray-600 pt-4 mb-6">
-                    <h2 class="text-xl">Total: <span id="totalPrice" class="text-2xl font-bold text-green-400">$0.00</span></h2>
+                    <h2 class="text-xl">Item Total: <span id="totalPrice" class="text-2xl font-bold text-green-400">$0.00</span></h2>
                 </div>
 
-                <button id="orderBtn" class="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-4 rounded transition duration-200" onclick="submitOrder()">
-                    Place Order
+                <!-- Changed to Add to Cart -->
+                <button class="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-4 rounded transition duration-200 shadow-lg" onclick="addToCart()">
+                    Add to Cart
                 </button>
+            </div>
+        </section>
+
+        <!-- ============================================= -->
+        <!-- SCREEN 3: SHOPPING CART OVERVIEW -->
+        <!-- ============================================= -->
+        <section id="cart-screen" class="hidden">
+            <div class="bg-gray-800 rounded-xl shadow-lg p-6">
+                <h2 class="text-2xl font-bold text-white mb-4">Your Cart</h2>
+                
+                <div id="cartItemsContainer" class="mb-6 space-y-3">
+                    <!-- Cart items will populate here -->
+                </div>
+
+                <div class="border-t border-gray-600 pt-4 mb-6 flex justify-between items-end">
+                    <h2 class="text-lg">Grand Total:</h2>
+                    <span id="grandTotalPrice" class="text-2xl font-bold text-green-400">$0.00</span>
+                </div>
+
+                <div class="flex flex-col gap-3">
+                    <button class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-4 rounded transition duration-200 shadow-lg" onclick="submitOrder()">
+                        Checkout via Telegram
+                    </button>
+                    <button class="w-full bg-gray-700 hover:bg-gray-600 text-gray-300 font-bold py-3 px-4 rounded transition duration-200" onclick="showSelectionScreen()">
+                        Continue Shopping
+                    </button>
+                </div>
             </div>
         </section>
     </div>
@@ -60,7 +92,10 @@
         const tg = window.Telegram.WebApp;
         tg.expand(); 
 
-        // Product Catalog 
+        // State variables
+        let cart = [];
+        let currentScreen = 'selection'; // tracking for the back button
+
         const products = [
             { id: "raw_gt", name: "Golden Teacher", img: "gt.PNG", basePrice: 12.00, type: "raw" },
             { id: "raw_bplus", name: "B+", img: "bplus.PNG", basePrice: 13.00, type: "raw" },
@@ -70,7 +105,6 @@
             { id: "gummy_gt", name: "GT Gummies", img: "gummies.PNG", basePrice: 30.00, type: "gummy" }
         ];
 
-        // Core ordering options
         const rawOptions = [
             { label: "1/8 oz (3.5g)", multiplier: 3.5 },
             { label: "1/4 oz (7g)", multiplier: 7 },
@@ -78,14 +112,9 @@
             { label: "1 oz (28g)", multiplier: 28 }
         ];
 
-        // The single option for gummies
         const gummyOptions = [
             { label: "20 Pack", multiplier: 1 }
         ];
-
-        // ---------------------------------------------
-        // Core Logic
-        // ---------------------------------------------
 
         function init() {
             populateSelectionGrid();
@@ -94,15 +123,16 @@
 
             // Set up the Telegram Back Button behavior
             tg.BackButton.onClick(() => {
-                showSelectionScreen();
+                if (currentScreen === 'details' || currentScreen === 'cart') {
+                    showSelectionScreen();
+                }
             });
         }
 
-        // Screen 1 Logic: Generate the grid
+        // --- Grid Generation ---
         function populateSelectionGrid() {
             const grid = document.getElementById('product-grid');
             grid.innerHTML = ''; 
-
             products.forEach(p => {
                 const card = document.createElement('div');
                 card.className = "bg-gray-800 rounded-xl shadow-lg p-4 flex flex-col items-center cursor-pointer transform hover:scale-105 transition-transform duration-200";
@@ -121,67 +151,65 @@
 
                 const descP = document.createElement('p');
                 descP.className = "text-sm text-gray-400 text-center";
-                
-                // Distinct descriptions for raw vs gummy
-                if (p.type === 'raw') {
-                    descP.textContent = `$${p.basePrice.toFixed(2)}/g`;
-                } else {
-                    descP.textContent = `20 Pack for $30`;
-                }
+                descP.textContent = p.type === 'raw' ? `$${p.basePrice.toFixed(2)}/g` : `20 Pack for $30`;
                 card.appendChild(descP);
 
                 grid.appendChild(card);
             });
         }
 
-        // Populates the dropdown once for the details screen
         function populateDropdown() {
             const select = document.getElementById('mushroomType');
             products.forEach(p => {
                 const el = document.createElement('option');
                 el.value = p.id;
-                
-                if (p.type === 'raw') {
-                    el.textContent = `${p.name} ($${p.basePrice.toFixed(2)}/g)`; 
-                } else {
-                    el.textContent = `${p.name} ($30/pack)`; 
-                }
-                
+                el.textContent = p.type === 'raw' ? `${p.name} ($${p.basePrice.toFixed(2)}/g)` : `${p.name} ($30/pack)`; 
                 select.appendChild(el);
             });
         }
 
+        // --- Navigation ---
         function showSelectionScreen() {
-            tg.BackButton.hide();
             document.getElementById('details-screen').classList.add('hidden');
+            document.getElementById('cart-screen').classList.add('hidden');
             document.getElementById('selection-screen').classList.remove('hidden');
+            tg.BackButton.hide();
+            currentScreen = 'selection';
         }
 
         function showDetailsScreen(productId) {
             document.getElementById('selection-screen').classList.add('hidden');
+            document.getElementById('cart-screen').classList.add('hidden');
             document.getElementById('details-screen').classList.remove('hidden');
             tg.BackButton.show();
+            currentScreen = 'details';
 
-            const select = document.getElementById('mushroomType');
-            select.value = productId;
-            
+            document.getElementById('mushroomType').value = productId;
             updateFormContextual(); 
         }
 
-        // Contextual Update logic
+        function showCartScreen() {
+            document.getElementById('selection-screen').classList.add('hidden');
+            document.getElementById('details-screen').classList.add('hidden');
+            document.getElementById('cart-screen').classList.remove('hidden');
+            
+            // If viewing cart from main menu, back button takes you to main menu
+            tg.BackButton.show();
+            currentScreen = 'cart';
+            renderCart();
+        }
+
+        // --- Form Logic ---
         function updateFormContextual() {
             const select = document.getElementById('mushroomType');
             const selectedProduct = products.find(p => p.id === select.value);
 
-            // Update Image
             document.getElementById('detailProductImage').src = selectedProduct.img;
 
-            // Handle quantity dropdown based on product type
             const quantitySelect = document.getElementById('quantity');
             quantitySelect.innerHTML = '';
 
             const options = selectedProduct.type === 'raw' ? rawOptions : gummyOptions;
-            
             options.forEach(opt => {
                 let el = document.createElement('option');
                 el.value = opt.multiplier;
@@ -192,31 +220,105 @@
             calculateTotal();
         }
 
-        // Core Calculation
         function calculateTotal() {
             const select = document.getElementById('mushroomType');
             const product = products.find(p => p.id === select.value);
             const multiplier = parseFloat(document.getElementById('quantity').value);
 
-            // Calculate total cleanly by multiplying base unit by the quantity multiplier
             const total = product.basePrice * multiplier;
-
             document.getElementById('totalPrice').innerText = `$${total.toFixed(2)}`;
+            // Attach raw numerical value for cart math later
+            document.getElementById('totalPrice').setAttribute('data-value', total);
         }
 
-        // Final Order Submission
-        function submitOrder() {
+        // --- Cart Logic ---
+        function addToCart() {
             const select = document.getElementById('mushroomType');
             const product = products.find(p => p.id === select.value);
-            
             const quantityLabel = document.getElementById('quantity').options[document.getElementById('quantity').selectedIndex].text;
-            const total = document.getElementById('totalPrice').innerText;
+            const priceText = document.getElementById('totalPrice').innerText;
+            const priceValue = parseFloat(document.getElementById('totalPrice').getAttribute('data-value'));
 
-            const orderData = {
-                strain: product.name,
+            // Push to cart array
+            cart.push({
+                name: product.name,
                 form: product.type === 'raw' ? 'Raw (Dried)' : 'Gummies',
                 size: quantityLabel,
-                price: total
+                price: priceText,
+                rawPrice: priceValue
+            });
+
+            // Update badge icon
+            const badge = document.getElementById('cartBadge');
+            badge.innerText = cart.length;
+            badge.classList.remove('hidden');
+
+            // Send them to cart screen
+            showCartScreen();
+        }
+
+        function removeFromCart(index) {
+            cart.splice(index, 1);
+            
+            // Update badge
+            const badge = document.getElementById('cartBadge');
+            if(cart.length > 0) {
+                badge.innerText = cart.length;
+            } else {
+                badge.classList.add('hidden');
+            }
+
+            renderCart();
+        }
+
+        function renderCart() {
+            const container = document.getElementById('cartItemsContainer');
+            container.innerHTML = '';
+
+            if (cart.length === 0) {
+                container.innerHTML = '<p class="text-gray-400 italic text-center py-4">Your cart is empty.</p>';
+                document.getElementById('grandTotalPrice').innerText = '$0.00';
+                return;
+            }
+
+            let grandTotal = 0;
+
+            cart.forEach((item, index) => {
+                grandTotal += item.rawPrice;
+
+                const itemDiv = document.createElement('div');
+                itemDiv.className = "flex justify-between items-center bg-gray-700 p-3 rounded border border-gray-600";
+                
+                itemDiv.innerHTML = `
+                    <div>
+                        <p class="font-bold text-white">${item.name} <span class="text-xs text-gray-400 font-normal">(${item.form})</span></p>
+                        <p class="text-sm text-gray-300">${item.size}</p>
+                    </div>
+                    <div class="flex items-center gap-4">
+                        <p class="font-bold text-green-400">${item.price}</p>
+                        <button onclick="removeFromCart(${index})" class="text-red-400 hover:text-red-300 transition">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" />
+                            </svg>
+                        </button>
+                    </div>
+                `;
+                container.appendChild(itemDiv);
+            });
+
+            document.getElementById('grandTotalPrice').innerText = `$${grandTotal.toFixed(2)}`;
+        }
+
+        // --- Final Submission ---
+        function submitOrder() {
+            if (cart.length === 0) {
+                tg.showAlert("Your cart is empty!");
+                return;
+            }
+
+            const orderData = {
+                cart_items: cart,
+                total_price: document.getElementById('grandTotalPrice').innerText
             };
 
             // Send data back to the Telegram Bot
