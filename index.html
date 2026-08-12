@@ -60,27 +60,27 @@
         const tg = window.Telegram.WebApp;
         tg.expand(); 
 
-        // Product Catalog (Note the new 'type' attribute and unique IDs)
+        // Product Catalog 
         const products = [
             { id: "raw_gt", name: "Golden Teacher", img: "gt.PNG", basePrice: 12.00, type: "raw" },
             { id: "raw_bplus", name: "B+", img: "bplus.PNG", basePrice: 13.00, type: "raw" },
             { id: "raw_snape", name: "Starry Nights", img: "snape.PNG", basePrice: 21.00, type: "raw" },
             { id: "raw_bluey", name: "Bluey Vuitton", img: "blueyvuitton.PNG", basePrice: 23.00, type: "raw" },
             { id: "raw_enigma", name: "Enigma", img: "enigma.PNG", basePrice: 25.00, type: "raw" },
-            { id: "gummy_gt", name: "GT Gummies", img: "gt.PNG", basePrice: 12.00, type: "gummy" }
+            { id: "gummy_gt", name: "GT Gummies", img: "gummies.PNG", basePrice: 30.00, type: "gummy" }
         ];
 
         // Core ordering options
         const rawOptions = [
-            { label: "1/8 oz (3.5g)", grams: 3.5 },
-            { label: "1/4 oz (7g)", grams: 7 },
-            { label: "1/2 oz (14g)", grams: 14 },
-            { label: "1 oz (28g)", grams: 28 }
+            { label: "1/8 oz (3.5g)", multiplier: 3.5 },
+            { label: "1/4 oz (7g)", multiplier: 7 },
+            { label: "1/2 oz (14g)", multiplier: 14 },
+            { label: "1 oz (28g)", multiplier: 28 }
         ];
 
+        // The single option for gummies
         const gummyOptions = [
-            { label: "10 Pack (10g eq)", grams: 10 },
-            { label: "20 Pack (20g eq)", grams: 20 }
+            { label: "20 Pack", multiplier: 1 }
         ];
 
         // ---------------------------------------------
@@ -121,11 +121,12 @@
 
                 const descP = document.createElement('p');
                 descP.className = "text-sm text-gray-400 text-center";
+                
                 // Distinct descriptions for raw vs gummy
                 if (p.type === 'raw') {
                     descP.textContent = `$${p.basePrice.toFixed(2)}/g`;
                 } else {
-                    descP.textContent = `10 & 20 Packs`;
+                    descP.textContent = `20 Pack for $30`;
                 }
                 card.appendChild(descP);
 
@@ -143,7 +144,7 @@
                 if (p.type === 'raw') {
                     el.textContent = `${p.name} ($${p.basePrice.toFixed(2)}/g)`; 
                 } else {
-                    el.textContent = `${p.name}`; 
+                    el.textContent = `${p.name} ($30/pack)`; 
                 }
                 
                 select.appendChild(el);
@@ -183,7 +184,7 @@
             
             options.forEach(opt => {
                 let el = document.createElement('option');
-                el.value = opt.grams;
+                el.value = opt.multiplier;
                 el.textContent = opt.label;
                 quantitySelect.appendChild(el);
             });
@@ -195,16 +196,10 @@
         function calculateTotal() {
             const select = document.getElementById('mushroomType');
             const product = products.find(p => p.id === select.value);
-            const grams = parseFloat(document.getElementById('quantity').value);
+            const multiplier = parseFloat(document.getElementById('quantity').value);
 
-            let total = 0;
-            if (product.type === 'raw') {
-                total = product.basePrice * grams;
-            } else if (product.type === 'gummy') {
-                // 50% markup on the base market price for the gummies
-                const markedUpPrice = product.basePrice * 1.5;
-                total = markedUpPrice * grams;
-            }
+            // Calculate total cleanly by multiplying base unit by the quantity multiplier
+            const total = product.basePrice * multiplier;
 
             document.getElementById('totalPrice').innerText = `$${total.toFixed(2)}`;
         }
@@ -219,7 +214,7 @@
 
             const orderData = {
                 strain: product.name,
-                form: product.type === 'raw' ? 'Raw (Dried)' : 'Gummy',
+                form: product.type === 'raw' ? 'Raw (Dried)' : 'Gummies',
                 size: quantityLabel,
                 price: total
             };
