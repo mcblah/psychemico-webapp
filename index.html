@@ -27,7 +27,12 @@
         <!-- SCREEN 1: PRODUCT SELECTION GRID -->
         <!-- ============================================= -->
         <section id="selection-screen">
-            <div id="product-grid" class="grid grid-cols-2 gap-4">
+            <!-- Loading Indicator -->
+            <div id="loadingMessage" class="text-center text-gray-400 py-10">
+                <p>Loading live inventory...</p>
+            </div>
+            
+            <div id="product-grid" class="grid grid-cols-2 gap-4 hidden">
                 <!-- Product cards will be generated here by JavaScript -->
             </div>
         </section>
@@ -37,23 +42,23 @@
         <!-- ============================================= -->
         <section id="details-screen" class="hidden">
             <div class="bg-gray-800 rounded-xl shadow-lg p-6">
+                
+                <h2 id="detailProductName" class="text-3xl font-bold text-center text-white mb-4">Product Name</h2>
+                <p id="detailProductForm" class="text-center text-gray-400 mb-6 font-semibold">Form</p>
+
                 <div class="flex justify-center mb-6">
                     <img id="detailProductImage" src="" alt="Product Image" class="h-48 w-48 object-cover rounded-xl shadow-lg border-2 border-gray-600">
                 </div>
                 
-                <label class="block mb-2 font-semibold">Selected Product:</label>
-                <select id="mushroomType" class="w-full p-2 mb-6 bg-gray-700 rounded border border-gray-600 focus:outline-none focus:border-purple-500" onchange="updateFormContextual()">
-                </select>
-
-                <label class="block mb-2 font-semibold">Quantity:</label>
-                <select id="quantity" class="w-full p-2 mb-6 bg-gray-700 rounded border border-gray-600 focus:outline-none focus:border-purple-500" onchange="calculateTotal()">
+                <label class="block mb-2 font-semibold">Select Available Size:</label>
+                <!-- This dropdown populates based on the Google Sheet -->
+                <select id="sizeSelector" class="w-full p-2 mb-6 bg-gray-700 rounded border border-gray-600 focus:outline-none focus:border-purple-500" onchange="updatePrice()">
                 </select>
 
                 <div class="border-t border-gray-600 pt-4 mb-6">
                     <h2 class="text-xl">Item Total: <span id="totalPrice" class="text-2xl font-bold text-green-400">$0.00</span></h2>
                 </div>
 
-                <!-- Changed to Add to Cart -->
                 <button class="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-4 rounded transition duration-200 shadow-lg" onclick="addToCart()">
                     Add to Cart
                 </button>
@@ -92,35 +97,31 @@
         const tg = window.Telegram.WebApp;
         tg.expand(); 
 
+        // PASTE YOUR PUBLISHED GOOGLE SHEETS CSV LINK HERE
+        const sheetUrl = "YOUR_CSV_LINK_HERE";
+
         // State variables
         let cart = [];
-        let currentScreen = 'selection'; // tracking for the back button
+        let currentScreen = 'selection';
+        let inventoryData = []; // Holds the rows that are IN STOCK
+        let currentSelectedStrainRows = []; // Holds sizes for the clicked product
 
-        const products = [
-            { id: "raw_gt", name: "Golden Teacher", img: "gt.PNG", basePrice: 12.00, type: "raw" },
-            { id: "raw_bplus", name: "B+", img: "bplus.PNG", basePrice: 13.00, type: "raw" },
-            { id: "raw_snape", name: "Starry Nights", img: "snape.PNG", basePrice: 21.00, type: "raw" },
-            { id: "raw_bluey", name: "Bluey Vuitton", img: "blueyvuitton.PNG", basePrice: 23.00, type: "raw" },
-            { id: "raw_enigma", name: "Enigma", img: "enigma.PNG", basePrice: 25.00, type: "raw" },
-            { id: "gummy_gt", name: "GT Gummies", img: "gummies.PNG", basePrice: 30.00, type: "gummy" }
-        ];
+        // Map your spreadsheet names to your local image files
+        const imageMap = {
+            "Golden Teacher": "gt.PNG",
+            "B+": "bplus.PNG",
+            "Starry Nights (Albino Penis Envy)": "snape.PNG",
+            "Bluey Viutton": "blueyvuitton.PNG",
+            "Enigma": "enigma.PNG",
+            "Penis Envy": "gt.PNG", // Fallback if no specific image
+            "Jedi Mind Fuck": "gt.PNG", // Fallback
+            "GT Gummys": "gummies.PNG"
+        };
 
-        const rawOptions = [
-            { label: "1/8 oz (3.5g)", multiplier: 3.5 },
-            { label: "1/4 oz (7g)", multiplier: 7 },
-            { label: "1/2 oz (14g)", multiplier: 14 },
-            { label: "1 oz (28g)", multiplier: 28 }
-        ];
-
-        const gummyOptions = [
-            { label: "20 Pack", multiplier: 1 }
-        ];
-
-        function init() {
+        async function init() {
+            await loadInventory();
             populateSelectionGrid();
-            populateDropdown();
-            showSelectionScreen();
-
+            
             // Set up the Telegram Back Button behavior
             tg.BackButton.onClick(() => {
                 if (currentScreen === 'details' || currentScreen === 'cart') {
@@ -129,42 +130,77 @@
             });
         }
 
+        // --- Data Fetching ---
+        async function loadInventory() {
+            try {
+                const response = await fetch(sheetUrl);
+                const csvText = await response.text();
+                
+                // Parse CSV rows
+                const rows = csvText.split('\n').slice(1);
+                
+                inventoryData = [];
+                rows.forEach(row => {
+                    if (!row.trim()) return;
+                    const cols = row.split(',');
+                    if (cols.length >= 8) {
+                        const inStock = cols[7].trim().toUpperCase();
+                        // Only save it to the app's memory if it is TRUE in the sheet
+                        if (inStock === 'TRUE') {
+                            inventoryData.push({
+                                id: cols[0].trim(),
+                                name: cols[1].trim(),
+                                form: cols[2].trim(),
+                                size: cols[3].trim(),
+                                price: parseFloat(cols[5].trim())
+                            });
+                        }
+                    }
+                });
+            } catch (error) {
+                console.error("Error fetching inventory:", error);
+                document.getElementById('loadingMessage').innerHTML = "<p class='text-red-400'>Error loading inventory. Please try again.</p>";
+            }
+        }
+
         // --- Grid Generation ---
         function populateSelectionGrid() {
+            document.getElementById('loadingMessage').classList.add('hidden');
             const grid = document.getElementById('product-grid');
+            grid.classList.remove('hidden');
             grid.innerHTML = ''; 
-            products.forEach(p => {
+
+            // Find all unique product names that have at least one size in stock
+            const uniqueNames = [...new Set(inventoryData.map(item => item.name))];
+
+            uniqueNames.forEach(name => {
+                // Get all available sizes for this strain to find the starting price
+                const availableSizes = inventoryData.filter(i => i.name === name);
+                const minPrice = Math.min(...availableSizes.map(i => i.price));
+                const formType = availableSizes[0].form;
+
                 const card = document.createElement('div');
                 card.className = "bg-gray-800 rounded-xl shadow-lg p-4 flex flex-col items-center cursor-pointer transform hover:scale-105 transition-transform duration-200";
-                card.onclick = () => showDetailsScreen(p.id);
+                card.onclick = () => showDetailsScreen(name);
 
                 const img = document.createElement('img');
-                img.src = p.img;
-                img.alt = p.name;
+                // Use the image map, or a fallback if the name isn't listed
+                img.src = imageMap[name] || "gt.PNG"; 
+                img.alt = name;
                 img.className = "h-32 w-32 object-cover rounded-lg mb-4 border border-gray-600 shadow-md";
                 card.appendChild(img);
 
                 const nameH2 = document.createElement('h2');
                 nameH2.className = "text-lg font-bold text-white text-center mb-1";
-                nameH2.textContent = p.name;
+                nameH2.textContent = name;
                 card.appendChild(nameH2);
 
                 const descP = document.createElement('p');
                 descP.className = "text-sm text-gray-400 text-center";
-                descP.textContent = p.type === 'raw' ? `$${p.basePrice.toFixed(2)}/g` : `20 Pack for $30`;
+                descP.textContent = `Starting at $${minPrice.toFixed(2)}`;
                 card.appendChild(descP);
 
                 grid.appendChild(card);
-            });
-        }
-
-        function populateDropdown() {
-            const select = document.getElementById('mushroomType');
-            products.forEach(p => {
-                const el = document.createElement('option');
-                el.value = p.id;
-                el.textContent = p.type === 'raw' ? `${p.name} ($${p.basePrice.toFixed(2)}/g)` : `${p.name} ($30/pack)`; 
-                select.appendChild(el);
             });
         }
 
@@ -177,15 +213,35 @@
             currentScreen = 'selection';
         }
 
-        function showDetailsScreen(productId) {
+        function showDetailsScreen(strainName) {
             document.getElementById('selection-screen').classList.add('hidden');
             document.getElementById('cart-screen').classList.add('hidden');
             document.getElementById('details-screen').classList.remove('hidden');
             tg.BackButton.show();
             currentScreen = 'details';
 
-            document.getElementById('mushroomType').value = productId;
-            updateFormContextual(); 
+            // Filter data to only show sizes for the clicked strain
+            currentSelectedStrainRows = inventoryData.filter(i => i.name === strainName);
+
+            // Update UI
+            document.getElementById('detailProductName').innerText = strainName;
+            document.getElementById('detailProductForm').innerText = currentSelectedStrainRows[0].form;
+            document.getElementById('detailProductImage').src = imageMap[strainName] || "gt.PNG";
+
+            // Populate Dropdown
+            const select = document.getElementById('sizeSelector');
+            select.innerHTML = '';
+            currentSelectedStrainRows.forEach(row => {
+                const opt = document.createElement('option');
+                opt.value = row.id;
+                opt.textContent = `${row.size} - $${row.price.toFixed(2)}`;
+                // Store raw price in a data attribute so we can easily grab it later
+                opt.setAttribute('data-price', row.price);
+                select.appendChild(opt);
+            });
+            
+            // Trigger calculation for the first item in the dropdown
+            updatePrice(); 
         }
 
         function showCartScreen() {
@@ -193,59 +249,35 @@
             document.getElementById('details-screen').classList.add('hidden');
             document.getElementById('cart-screen').classList.remove('hidden');
             
-            // If viewing cart from main menu, back button takes you to main menu
             tg.BackButton.show();
             currentScreen = 'cart';
             renderCart();
         }
 
         // --- Form Logic ---
-        function updateFormContextual() {
-            const select = document.getElementById('mushroomType');
-            const selectedProduct = products.find(p => p.id === select.value);
+        function updatePrice() {
+            const select = document.getElementById('sizeSelector');
+            const selectedOption = select.options[select.selectedIndex];
+            const price = parseFloat(selectedOption.getAttribute('data-price'));
 
-            document.getElementById('detailProductImage').src = selectedProduct.img;
-
-            const quantitySelect = document.getElementById('quantity');
-            quantitySelect.innerHTML = '';
-
-            const options = selectedProduct.type === 'raw' ? rawOptions : gummyOptions;
-            options.forEach(opt => {
-                let el = document.createElement('option');
-                el.value = opt.multiplier;
-                el.textContent = opt.label;
-                quantitySelect.appendChild(el);
-            });
-            
-            calculateTotal();
-        }
-
-        function calculateTotal() {
-            const select = document.getElementById('mushroomType');
-            const product = products.find(p => p.id === select.value);
-            const multiplier = parseFloat(document.getElementById('quantity').value);
-
-            const total = product.basePrice * multiplier;
-            document.getElementById('totalPrice').innerText = `$${total.toFixed(2)}`;
-            // Attach raw numerical value for cart math later
-            document.getElementById('totalPrice').setAttribute('data-value', total);
+            document.getElementById('totalPrice').innerText = `$${price.toFixed(2)}`;
+            document.getElementById('totalPrice').setAttribute('data-value', price);
         }
 
         // --- Cart Logic ---
         function addToCart() {
-            const select = document.getElementById('mushroomType');
-            const product = products.find(p => p.id === select.value);
-            const quantityLabel = document.getElementById('quantity').options[document.getElementById('quantity').selectedIndex].text;
-            const priceText = document.getElementById('totalPrice').innerText;
-            const priceValue = parseFloat(document.getElementById('totalPrice').getAttribute('data-value'));
-
+            const select = document.getElementById('sizeSelector');
+            const selectedId = select.value;
+            // Find the exact row object from our data
+            const productRow = currentSelectedStrainRows.find(r => r.id === selectedId);
+            
             // Push to cart array
             cart.push({
-                name: product.name,
-                form: product.type === 'raw' ? 'Raw (Dried)' : 'Gummies',
-                size: quantityLabel,
-                price: priceText,
-                rawPrice: priceValue
+                name: productRow.name,
+                form: productRow.form,
+                size: productRow.size,
+                price: `$${productRow.price.toFixed(2)}`,
+                rawPrice: productRow.price
             });
 
             // Update badge icon
@@ -326,8 +358,8 @@
             tg.close();
         }
 
-        // Initialize form on load
-        init();
+        // Initialize on load
+        document.addEventListener('DOMContentLoaded', init);
     </script>
 </body>
 </html>
