@@ -152,7 +152,7 @@
                                 name: cols[1].trim(),
                                 form: cols[2].trim(),
                                 size: cols[3].trim(),
-                                price: parseFloat(cols[5].trim())
+                                price: parseFloat(cols[5].replace(/[^0-9.]/g, ''))
                             });
                         }
                     }
